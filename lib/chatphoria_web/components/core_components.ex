@@ -113,24 +113,43 @@ defmodule ChatphoriaWeb.CoreComponents do
       :if={msg = render_slot(@inner_block) || Phoenix.Flash.get(@flash, @kind)}
       id={@id}
       phx-click={JS.push("lv:clear-flash", value: %{key: @kind}) |> hide("##{@id}")}
+      phx-hook="FlashAutoDismiss"
       role="alert"
       class={[
-        "fixed top-2 right-2 mr-2 w-80 sm:w-96 z-50 rounded-lg p-4 shadow-lg",
+        "fixed top-2 right-2 mr-2 w-80 sm:w-96 z-50 rounded-lg shadow-lg overflow-hidden",
         @kind == :info && "bg-gradient-to-r from-blue-500 to-indigo-600 text-white",
         @kind == :error && "bg-gradient-to-r from-red-500 to-red-600 text-white"
       ]}
       {@rest}
     >
-      <p :if={@title} class="flex items-center gap-1.5 text-sm font-semibold leading-6">
-        <.icon :if={@kind == :info} name="hero-information-circle-mini" class="h-4 w-4 text-white" />
-        <.icon :if={@kind == :error} name="hero-exclamation-circle-mini" class="h-4 w-4 text-white" />
-        {@title}
-      </p>
-      <p class="mt-2 text-sm leading-5 text-white">{msg}</p>
-      <button type="button" class="group absolute top-1 right-1 p-2" aria-label={gettext("close")}>
-        <.icon name="hero-x-mark-solid" class="h-5 w-5 text-white opacity-70 group-hover:opacity-100" />
-      </button>
+      <div class="p-4">
+        <p :if={@title} class="flex items-center gap-1.5 text-sm font-semibold leading-6">
+          <.icon :if={@kind == :info} name="hero-information-circle-mini" class="h-4 w-4 text-white" />
+          <.icon :if={@kind == :error} name="hero-exclamation-circle-mini" class="h-4 w-4 text-white" />
+          {@title}
+        </p>
+        <p class="mt-2 text-sm leading-5 text-white">{msg}</p>
+        <button type="button" class="group absolute top-1 right-1 p-2" aria-label={gettext("close")}>
+          <.icon name="hero-x-mark-solid" class="h-5 w-5 text-white opacity-70 group-hover:opacity-100" />
+        </button>
+      </div>
+      <!-- Progress bar -->
+      <div class="h-1 bg-black bg-opacity-20">
+        <div class="h-full bg-white opacity-80 flash-progress-bar"></div>
+      </div>
     </div>
+    
+    <style>
+      .flash-progress-bar {
+        width: 100%;
+        animation: flash-countdown 5s linear forwards;
+      }
+      
+      @keyframes flash-countdown {
+        from { width: 100%; }
+        to { width: 0%; }
+      }
+    </style>
     """
   end
 

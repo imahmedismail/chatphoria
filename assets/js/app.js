@@ -22,10 +22,67 @@ import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 
+// Define LiveView hooks
+let Hooks = {}
+
+// Flash auto-dismiss hook
+Hooks.FlashAutoDismiss = {
+  mounted() {
+    const flashElement = this.el
+    let timeoutId = null
+    
+    // Start auto-dismiss timer
+    const startTimer = () => {
+      timeoutId = setTimeout(() => {
+        if (flashElement && flashElement.isConnected) {
+          flashElement.click()
+        }
+      }, 5000)
+    }
+    
+    // Start the initial timer
+    startTimer()
+    
+    // Pause animation and timer on hover
+    flashElement.addEventListener('mouseenter', () => {
+      const progressBar = flashElement.querySelector('.flash-progress-bar')
+      if (progressBar) {
+        progressBar.style.animationPlayState = 'paused'
+      }
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+        timeoutId = null
+      }
+    })
+    
+    // Resume animation and restart timer when mouse leaves
+    flashElement.addEventListener('mouseleave', () => {
+      const progressBar = flashElement.querySelector('.flash-progress-bar')
+      if (progressBar) {
+        progressBar.style.animationPlayState = 'running'
+        // Calculate remaining time based on progress bar width
+        const computedStyle = window.getComputedStyle(progressBar)
+        const currentWidth = parseFloat(computedStyle.width)
+        const parentWidth = parseFloat(window.getComputedStyle(progressBar.parentElement).width)
+        const remainingPercentage = currentWidth / parentWidth
+        const remainingTime = 5000 * remainingPercentage
+        
+        // Restart timer with remaining time
+        timeoutId = setTimeout(() => {
+          if (flashElement && flashElement.isConnected) {
+            flashElement.click()
+          }
+        }, remainingTime)
+      }
+    })
+  }
+}
+
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
-  params: {_csrf_token: csrfToken}
+  params: {_csrf_token: csrfToken},
+  hooks: Hooks
 })
 
 // Show progress bar on live navigation and form submits
