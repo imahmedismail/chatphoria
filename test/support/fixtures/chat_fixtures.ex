@@ -70,4 +70,43 @@ defmodule Chatphoria.ChatFixtures do
 
     membership
   end
+
+  @doc """
+  Generate a conversation.
+  """
+  def conversation_fixture(attrs \\ %{}) do
+    user1 = user_fixture()
+    user2 = user_fixture()
+
+    {:ok, conversation} =
+      attrs
+      |> Enum.into(%{
+        user1_id: user1.id,
+        user2_id: user2.id
+      })
+      |> Chatphoria.Chat.create_conversation()
+
+    conversation
+  end
+
+  @doc """
+  Generate a conversation message.
+  """
+  def conversation_message_fixture(attrs \\ %{}) do
+    user = user_fixture()
+    conversation = conversation_fixture()
+    room = room_fixture()
+
+    {:ok, message} =
+      attrs
+      |> Enum.into(%{
+        content: "Test conversation message",
+        user_id: user.id,
+        conversation_id: conversation.id,
+        room_id: room.id
+      })
+      |> Chatphoria.Chat.create_conversation_message()
+
+    message
+  end
 end

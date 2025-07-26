@@ -24,7 +24,7 @@ defmodule ChatphoriaWeb.UserSessionControllerTest do
       }
 
       conn = post(conn, ~p"/login", user_params)
-      
+
       assert redirected_to(conn) == ~p"/chat"
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Welcome newuser!"
       assert get_session(conn, :user_id)
@@ -41,7 +41,7 @@ defmodule ChatphoriaWeb.UserSessionControllerTest do
       }
 
       conn = post(conn, ~p"/login", user_params)
-      
+
       assert redirected_to(conn) == ~p"/chat"
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Welcome back #{user.username}!"
       assert get_session(conn, :user_id) == user.id
@@ -56,7 +56,7 @@ defmodule ChatphoriaWeb.UserSessionControllerTest do
       }
 
       conn = post(conn, ~p"/login", user_params)
-      
+
       response = html_response(conn, 200)
       assert response =~ "Invalid username or email"
     end
@@ -65,13 +65,13 @@ defmodule ChatphoriaWeb.UserSessionControllerTest do
   describe "GET /logout" do
     test "logs user out and redirects to home", %{conn: conn} do
       user = user_fixture()
-      
-      conn = 
+
+      conn =
         conn
         |> init_test_session(%{})
         |> put_session(:user_id, user.id)
         |> get(~p"/logout")
-      
+
       assert redirected_to(conn) == ~p"/"
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Logged out successfully"
       assert get_session(conn, :user_id) == nil

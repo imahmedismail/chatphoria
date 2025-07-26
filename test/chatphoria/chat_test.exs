@@ -92,7 +92,7 @@ defmodule Chatphoria.ChatTest do
     test "list_messages_for_room/2 respects limit parameter" do
       user = user_fixture()
       room = room_fixture()
-      
+
       # Create 5 messages
       Enum.each(1..5, fn i ->
         message_fixture(%{content: "Message #{i}", user_id: user.id, room_id: room.id})
@@ -204,6 +204,93 @@ defmodule Chatphoria.ChatTest do
       assert "room1" in room_names
       assert "room2" in room_names
       assert "room3" not in room_names
+    end
+  end
+
+  describe "conversations" do
+    alias Chatphoria.Chat.Conversation
+
+    import Chatphoria.AccountsFixtures
+    import Chatphoria.ChatFixtures
+
+    test "get_or_create_conversation/2 creates new conversation" do
+      user1 = user_fixture()
+      user2 = user_fixture()
+
+      assert {:ok, %Conversation{} = conversation} =
+               Chat.get_or_create_conversation(user1.id, user2.id)
+
+      assert conversation.user1_id == min(user1.id, user2.id)
+      assert conversation.user2_id == max(user1.id, user2.id)
+    end
+
+    test "get_or_create_conversation/2 returns existing conversation" do
+      user1 = user_fixture()
+      user2 = user_fixture()
+
+      {:ok, conversation1} = Chat.get_or_create_conversation(user1.id, user2.id)
+      {:ok, conversation2} = Chat.get_or_create_conversation(user2.id, user1.id)
+
+      assert conversation1.id == conversation2.id
+    end
+
+    test "list_conversations_for_user/1 returns user's conversations" do
+      user1 = user_fixture()
+      user2 = user_fixture()
+      user3 = user_fixture()
+
+      {:ok, conv1} = Chat.get_or_create_conversation(user1.id, user2.id)
+      {:ok, conv2} = Chat.get_or_create_conversation(user1.id, user3.id)
+
+      conversations = Chat.list_conversations_for_user(user1.id)
+      assert length(conversations) == 2
+
+      conversation_ids = Enum.map(conversations, & &1.id)
+      assert conv1.id in conversation_ids
+      assert conv2.id in conversation_ids
+    end
+
+    test "create_conversation_message/1 creates message and updates timestamp" do
+      conversation = conversation_fixture()
+      user = user_fixture()
+      room = room_fixture()
+
+      attrs = %{
+        content: "Hello there!",
+        user_id: user.id,
+        conversation_id: conversation.id,
+        room_id: room.id
+      }
+
+      assert {:ok, message} = Chat.create_conversation_message(attrs)
+      assert message.content == "Hello there!"
+      assert message.conversation_id == conversation.id
+
+      # Check that conversation timestamp was updated
+      updated_conversation = Chat.get_conversation!(conversation.id)
+      assert updated_conversation.last_message_at != nil
+    end
+
+    test "list_messages_for_conversation/1 returns conversation messages" do
+      conversation = conversation_fixture()
+      user = user_fixture()
+
+      Chat.create_conversation_message(%{
+        content: "First message",
+        user_id: user.id,
+        conversation_id: conversation.id
+      })
+
+      Chat.create_conversation_message(%{
+        content: "Second message",
+        user_id: user.id,
+        conversation_id: conversation.id
+      })
+
+      messages = Chat.list_messages_for_conversation(conversation.id)
+      assert length(messages) == 2
+      assert List.first(messages).content == "First message"
+      assert List.last(messages).content == "Second message"
     end
   end
 end

@@ -12,11 +12,13 @@ users = [
   %{username: "charlie", email: "charlie@example.com"}
 ]
 
-created_users = 
+created_users =
   Enum.map(users, fn user_attrs ->
     case Accounts.create_user(user_attrs) do
-      {:ok, user} -> user
-      {:error, _} -> 
+      {:ok, user} ->
+        user
+
+      {:error, _} ->
         # User might already exist
         Accounts.get_user_by_username(user_attrs.username)
     end
@@ -31,10 +33,12 @@ rooms = [
   %{name: "Tech Talk", description: "Technology discussions", created_by_id: alice.id}
 ]
 
-created_rooms = 
+created_rooms =
   Enum.map(rooms, fn room_attrs ->
     case Chat.create_room(room_attrs) do
-      {:ok, room} -> room
+      {:ok, room} ->
+        room
+
       {:error, _} ->
         # Room might already exist
         from(r in Chat.Room, where: r.name == ^room_attrs.name) |> Repo.one()
@@ -51,8 +55,16 @@ general_room = Enum.find(created_rooms, &(&1.name == "General"))
 
 sample_messages = [
   %{content: "Welcome to Chatphoria! 🎉", user_id: alice.id, room_id: general_room.id},
-  %{content: "This is a real-time chat application built with Phoenix LiveView", user_id: alice.id, room_id: general_room.id},
-  %{content: "Thanks Alice! Looks great 👍", user_id: Enum.at(created_users, 1).id, room_id: general_room.id}
+  %{
+    content: "This is a real-time chat application built with Phoenix LiveView",
+    user_id: alice.id,
+    room_id: general_room.id
+  },
+  %{
+    content: "Thanks Alice! Looks great 👍",
+    user_id: Enum.at(created_users, 1).id,
+    room_id: general_room.id
+  }
 ]
 
 Enum.each(sample_messages, fn message_attrs ->

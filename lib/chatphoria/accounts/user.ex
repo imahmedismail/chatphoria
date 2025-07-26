@@ -13,6 +13,8 @@ defmodule Chatphoria.Accounts.User do
     has_many :created_rooms, Chatphoria.Chat.Room, foreign_key: :created_by_id
     has_many :room_memberships, Chatphoria.Chat.RoomMembership
     has_many :rooms, through: [:room_memberships, :room]
+    has_many :conversations_as_user1, Chatphoria.Chat.Conversation, foreign_key: :user1_id
+    has_many :conversations_as_user2, Chatphoria.Chat.Conversation, foreign_key: :user2_id
 
     timestamps()
   end

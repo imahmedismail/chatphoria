@@ -11,9 +11,9 @@ defmodule ChatphoriaWeb.ChatLiveTest do
       user = user_fixture()
       room = room_fixture()
       {:ok, _membership} = Chatphoria.Chat.join_room(user.id, room.id)
-      
+
       conn = conn |> init_test_session(%{}) |> put_session(:user_id, user.id)
-      
+
       %{user: user, room: room, conn: conn}
     end
 
@@ -24,7 +24,7 @@ defmodule ChatphoriaWeb.ChatLiveTest do
 
     test "displays chat interface when authenticated", %{conn: conn, user: user, room: room} do
       {:ok, _view, html} = live(conn, ~p"/chat")
-      
+
       assert html =~ user.username
       assert html =~ room.name
       assert html =~ "Message ##{room.name}"
@@ -56,9 +56,9 @@ defmodule ChatphoriaWeb.ChatLiveTest do
     test "creates a new room", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/chat")
 
-      # Click "New" button to show create room form
-      view |> element("button", "+ New") |> render_click()
-      
+      # Click the room create button specifically
+      view |> element("button[phx-click='toggle_create_room']") |> render_click()
+
       assert has_element?(view, "form")
       assert has_element?(view, "input[name='room_name']")
 
@@ -90,32 +90,34 @@ defmodule ChatphoriaWeb.ChatLiveTest do
 
     test "displays messages in chronological order", %{conn: conn, user: user, room: room} do
       # Create some messages with slight delay to ensure different timestamps
-      {:ok, _msg1} = Chatphoria.Chat.create_message(%{
-        content: "First message",
-        user_id: user.id,
-        room_id: room.id
-      })
+      {:ok, _msg1} =
+        Chatphoria.Chat.create_message(%{
+          content: "First message",
+          user_id: user.id,
+          room_id: room.id
+        })
 
       # Small delay to ensure different timestamps
       Process.sleep(10)
 
-      {:ok, _msg2} = Chatphoria.Chat.create_message(%{
-        content: "Second message", 
-        user_id: user.id,
-        room_id: room.id
-      })
+      {:ok, _msg2} =
+        Chatphoria.Chat.create_message(%{
+          content: "Second message",
+          user_id: user.id,
+          room_id: room.id
+        })
 
       {:ok, _view, html} = live(conn, ~p"/chat")
 
       # Check that both messages appear
       assert html =~ "First message"
       assert html =~ "Second message"
-      
+
       # Messages appear in the order they are returned from the database
       # Due to our query and reverse, newer messages appear after older ones
       first_pos = :binary.match(html, "First message") |> elem(0)
       second_pos = :binary.match(html, "Second message") |> elem(0)
-      
+
       # The actual test should verify that messages are displayed consistently
       # regardless of the specific order - just ensure both are present
       assert first_pos > 0
@@ -132,7 +134,7 @@ defmodule ChatphoriaWeb.ChatLiveTest do
     test "shows online user count", %{conn: conn, user: user} do
       # Set user as online
       {:ok, _user} = Chatphoria.Accounts.update_user_status(user, "online")
-      
+
       {:ok, _view, html} = live(conn, ~p"/chat")
 
       assert html =~ "1 online"
@@ -144,9 +146,9 @@ defmodule ChatphoriaWeb.ChatLiveTest do
       user = user_fixture()
       room = room_fixture()
       {:ok, _membership} = Chatphoria.Chat.join_room(user.id, room.id)
-      
+
       conn = conn |> init_test_session(%{}) |> put_session(:user_id, user.id)
-      
+
       %{user: user, room: room, conn: conn}
     end
 
@@ -166,7 +168,7 @@ defmodule ChatphoriaWeb.ChatLiveTest do
       view
       |> form("form[phx-submit='send_message']", %{"message" => "   "})
       |> render_submit()
-      
+
       # Check that no new messages were added
       final_html = view |> element("#messages-container") |> render()
       final_count = final_html |> String.split("flex space-x-3") |> length()

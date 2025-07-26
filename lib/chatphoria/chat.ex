@@ -1,7 +1,7 @@
 defmodule Chatphoria.Chat do
   import Ecto.Query, warn: false
   alias Chatphoria.Repo
-  alias Chatphoria.Chat.{Room, Message, RoomMembership}
+  alias Chatphoria.Chat.{Room, Message, RoomMembership, Conversation}
 
   # Rooms
   def list_rooms do
@@ -90,5 +90,75 @@ defmodule Chatphoria.Chat do
       preload: [:created_by]
     )
     |> Repo.all()
+  end
+
+  # Conversations
+  def list_conversations_for_user(user_id) do
+    from(c in Conversation,
+      where: c.user1_id == ^user_id or c.user2_id == ^user_id,
+      order_by: [desc: c.last_message_at],
+      preload: [:user1, :user2]
+    )
+    |> Repo.all()
+  end
+
+  def get_conversation!(id) do
+    Repo.get!(Conversation, id)
+    |> Repo.preload([:user1, :user2, messages: [:user]])
+  end
+
+  def get_or_create_conversation(user1_id, user2_id) do
+    {lower_id, higher_id} =
+      if user1_id < user2_id, do: {user1_id, user2_id}, else: {user2_id, user1_id}
+
+    case Repo.get_by(Conversation, user1_id: lower_id, user2_id: higher_id) do
+      nil ->
+        create_conversation(%{user1_id: lower_id, user2_id: higher_id})
+
+      conversation ->
+        {:ok, conversation}
+    end
+  end
+
+  def create_conversation(attrs \\ %{}) do
+    %Conversation{}
+    |> Conversation.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  def list_messages_for_conversation(conversation_id, limit \\ 50) do
+    from(m in Message,
+      where: m.conversation_id == ^conversation_id,
+      order_by: [desc: m.inserted_at],
+      limit: ^limit,
+      preload: [:user]
+    )
+    |> Repo.all()
+    |> Enum.reverse()
+  end
+
+  def create_conversation_message(attrs \\ %{}) do
+    result =
+      %Message{}
+      |> Message.changeset(attrs)
+      |> Repo.insert()
+
+    case result do
+      {:ok, message} ->
+        # Update conversation's last_message_at
+        if message.conversation_id do
+          update_conversation_timestamp(message.conversation_id)
+        end
+
+        result
+
+      error ->
+        error
+    end
+  end
+
+  defp update_conversation_timestamp(conversation_id) do
+    from(c in Conversation, where: c.id == ^conversation_id)
+    |> Repo.update_all(set: [last_message_at: DateTime.utc_now()])
   end
 end

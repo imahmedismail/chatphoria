@@ -20,7 +20,7 @@ defmodule ChatphoriaWeb.Router do
     get "/", UserSessionController, :new
     post "/login", UserSessionController, :create
     get "/logout", UserSessionController, :delete
-    
+
     live "/chat", ChatLive
   end
 
