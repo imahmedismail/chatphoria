@@ -44,7 +44,8 @@ defmodule ChatphoriaWeb.ChatLive do
      |> assign(:show_create_room, false)
      |> assign(:new_room_name, "")
      |> assign(:new_room_description, "")
-     |> assign(:typing_users, [])}
+     |> assign(:typing_users, [])
+     |> assign(:show_sidebar, false)}
   end
 
   @impl true
@@ -85,6 +86,11 @@ defmodule ChatphoriaWeb.ChatLive do
   @impl true
   def handle_event("toggle_create_room", _params, socket) do
     {:noreply, assign(socket, :show_create_room, !socket.assigns.show_create_room)}
+  end
+
+  @impl true
+  def handle_event("toggle_sidebar", _params, socket) do
+    {:noreply, assign(socket, :show_sidebar, !socket.assigns.show_sidebar)}
   end
 
   @impl true
@@ -145,7 +151,8 @@ defmodule ChatphoriaWeb.ChatLive do
      socket
      |> assign(:current_room, room)
      |> assign(:messages, messages)
-     |> assign(:typing_users, [])}
+     |> assign(:typing_users, [])
+     |> assign(:show_sidebar, false)}
   end
 
   @impl true
@@ -183,9 +190,34 @@ defmodule ChatphoriaWeb.ChatLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="flex h-screen bg-gray-100">
+    <div class="flex h-screen bg-gray-100 relative">
+      <!-- Mobile overlay -->
+      <%= if @show_sidebar do %>
+        <div 
+          class="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          phx-click="toggle_sidebar"
+        ></div>
+      <% end %>
+
       <!-- Sidebar -->
-      <div class="w-64 bg-white shadow-lg flex flex-col">
+      <div class={[
+        "bg-white shadow-lg flex flex-col transition-transform duration-300 ease-in-out z-50",
+        "lg:relative lg:translate-x-0 lg:w-64",
+        "fixed inset-y-0 left-0 w-80 max-w-[85vw]",
+        if(@show_sidebar, do: "translate-x-0", else: "-translate-x-full lg:translate-x-0")
+      ]}>
+        <!-- Mobile close button -->
+        <div class="lg:hidden p-4 border-b bg-gradient-to-r from-blue-500 to-indigo-600">
+          <button
+            phx-click="toggle_sidebar"
+            class="text-white hover:text-gray-200"
+          >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+
         <!-- User info -->
         <div class="p-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
           <div class="flex items-center space-x-3">
@@ -194,8 +226,8 @@ defmodule ChatphoriaWeb.ChatLive do
                 <%= String.first(@user.username) |> String.upcase() %>
               </span>
             </div>
-            <div>
-              <h3 class="font-semibold"><%= @user.username %></h3>
+            <div class="min-w-0 flex-1">
+              <h3 class="font-semibold truncate"><%= @user.username %></h3>
               <p class="text-blue-100 text-sm">Online</p>
             </div>
           </div>
@@ -208,7 +240,7 @@ defmodule ChatphoriaWeb.ChatLive do
               <h4 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Rooms</h4>
               <button
                 phx-click="toggle_create_room"
-                class="text-blue-500 hover:text-blue-700 font-semibold text-sm"
+                class="text-blue-500 hover:text-blue-700 font-semibold text-sm touch-manipulation"
               >
                 + New
               </button>
@@ -222,25 +254,25 @@ defmodule ChatphoriaWeb.ChatLive do
                     name="room_name"
                     placeholder="Room name"
                     required
-                    class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500"
+                    class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500 touch-manipulation"
                   />
                   <input
                     type="text"
                     name="room_description"
                     placeholder="Description (optional)"
-                    class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500"
+                    class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500 touch-manipulation"
                   />
                   <div class="flex space-x-2">
                     <button
                       type="submit"
-                      class="flex-1 bg-blue-500 text-white px-3 py-2 rounded text-sm hover:bg-blue-600"
+                      class="flex-1 bg-blue-500 text-white px-3 py-3 rounded text-sm hover:bg-blue-600 touch-manipulation"
                     >
                       Create
                     </button>
                     <button
                       type="button"
                       phx-click="toggle_create_room"
-                      class="flex-1 bg-gray-300 text-gray-700 px-3 py-2 rounded text-sm hover:bg-gray-400"
+                      class="flex-1 bg-gray-300 text-gray-700 px-3 py-3 rounded text-sm hover:bg-gray-400 touch-manipulation"
                     >
                       Cancel
                     </button>
@@ -255,16 +287,16 @@ defmodule ChatphoriaWeb.ChatLive do
                   phx-click="change_room"
                   phx-value-room_id={room.id}
                   class={[
-                    "w-full text-left p-3 rounded-lg transition-colors",
-                    if(@current_room.id == room.id, do: "bg-blue-100 text-blue-700", else: "hover:bg-gray-100")
+                    "w-full text-left p-3 rounded-lg transition-colors touch-manipulation",
+                    if(@current_room.id == room.id, do: "bg-blue-100 text-blue-700", else: "hover:bg-gray-100 active:bg-gray-200")
                   ]}
                 >
                   <div class="flex items-center space-x-2">
                     <span class="text-xl">#</span>
-                    <span class="font-medium"><%= room.name %></span>
+                    <span class="font-medium truncate"><%= room.name %></span>
                   </div>
                   <%= if room.description do %>
-                    <p class="text-sm text-gray-500 mt-1"><%= room.description %></p>
+                    <p class="text-sm text-gray-500 mt-1 truncate"><%= room.description %></p>
                   <% end %>
                 </button>
               <% end %>
@@ -276,7 +308,7 @@ defmodule ChatphoriaWeb.ChatLive do
         <div class="p-4 border-t">
           <a
             href="/logout"
-            class="block w-full text-center py-2 px-4 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors text-gray-700"
+            class="block w-full text-center py-3 px-4 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 rounded-lg transition-colors text-gray-700 touch-manipulation"
           >
             Logout
           </a>
@@ -284,50 +316,64 @@ defmodule ChatphoriaWeb.ChatLive do
       </div>
 
       <!-- Main chat area -->
-      <div class="flex-1 flex flex-col">
+      <div class="flex-1 flex flex-col min-w-0">
         <!-- Chat header -->
-        <div class="bg-white shadow-sm p-4 border-b">
+        <div class="bg-white shadow-sm p-3 lg:p-4 border-b">
           <div class="flex items-center justify-between">
-            <div>
-              <h2 class="text-xl font-semibold text-gray-900"># <%= @current_room.name %></h2>
-              <%= if @current_room.description do %>
-                <p class="text-gray-600"><%= @current_room.description %></p>
-              <% end %>
+            <div class="flex items-center space-x-3 min-w-0 flex-1">
+              <!-- Mobile menu button -->
+              <button
+                phx-click="toggle_sidebar"
+                class="lg:hidden p-2 -ml-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded touch-manipulation"
+              >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                </svg>
+              </button>
+              
+              <div class="min-w-0 flex-1">
+                <h2 class="text-lg lg:text-xl font-semibold text-gray-900 truncate"># <%= @current_room.name %></h2>
+                <%= if @current_room.description do %>
+                  <p class="text-gray-600 text-sm truncate hidden sm:block"><%= @current_room.description %></p>
+                <% end %>
+              </div>
             </div>
-            <div class="flex items-center space-x-2">
-              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                <%= length(@online_users) %> online
+            
+            <div class="flex items-center space-x-2 flex-shrink-0">
+              <span class="inline-flex items-center px-2 lg:px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                <span class="hidden sm:inline"><%= length(@online_users) %> online</span>
+                <span class="sm:hidden"><%= length(@online_users) %></span>
               </span>
             </div>
           </div>
         </div>
 
         <!-- Messages -->
-        <div class="flex-1 overflow-y-auto p-4 space-y-4" id="messages-container">
+        <div class="flex-1 overflow-y-auto p-3 lg:p-4 space-y-3 lg:space-y-4" id="messages-container">
           <%= for message <- @messages do %>
-            <div class="flex space-x-3">
-              <div class="w-8 h-8 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+            <div class="flex space-x-2 lg:space-x-3">
+              <div class="w-7 h-7 lg:w-8 lg:h-8 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-xs lg:text-sm flex-shrink-0">
                 <%= String.first(message.user.username) |> String.upcase() %>
               </div>
-              <div class="flex-1">
+              <div class="flex-1 min-w-0">
                 <div class="flex items-center space-x-2 mb-1">
-                  <span class="font-semibold text-gray-900"><%= message.user.username %></span>
-                  <span class="text-xs text-gray-500">
+                  <span class="font-semibold text-gray-900 text-sm lg:text-base truncate"><%= message.user.username %></span>
+                  <span class="text-xs text-gray-500 flex-shrink-0">
                     <%= Calendar.strftime(message.inserted_at, "%H:%M") %>
                   </span>
                 </div>
-                <p class="text-gray-700 leading-relaxed"><%= message.content %></p>
+                <p class="text-gray-700 leading-relaxed text-sm lg:text-base break-words"><%= message.content %></p>
               </div>
             </div>
           <% end %>
 
           <!-- Typing indicators -->
           <%= if length(@typing_users) > 0 do %>
-            <div class="flex space-x-3 animate-pulse">
-              <div class="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-gray-600 font-semibold text-xs">
+            <div class="flex space-x-2 lg:space-x-3 animate-pulse">
+              <div class="w-7 h-7 lg:w-8 lg:h-8 bg-gray-300 rounded-full flex items-center justify-center text-gray-600 font-semibold text-xs flex-shrink-0">
                 ●●●
               </div>
-              <div class="flex-1">
+              <div class="flex-1 min-w-0">
                 <p class="text-gray-500 text-sm italic">
                   <%= case length(@typing_users) do %>
                     <% 1 -> %><%= List.first(@typing_users).username %> is typing...
@@ -341,23 +387,28 @@ defmodule ChatphoriaWeb.ChatLive do
         </div>
 
         <!-- Message input -->
-        <div class="bg-white border-t p-4">
-          <form phx-submit="send_message" class="flex space-x-3">
+        <div class="bg-white border-t p-3 lg:p-4">
+          <form phx-submit="send_message" class="flex space-x-2 lg:space-x-3">
             <input
               type="text"
               name="message"
               value={@new_message}
               placeholder={"Message ##{@current_room.name}"}
-              class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              class="flex-1 px-3 lg:px-4 py-2 lg:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm lg:text-base touch-manipulation"
               autocomplete="off"
               phx-keyup="typing"
               phx-debounce="300"
             />
             <button
               type="submit"
-              class="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all"
+              class="px-4 lg:px-6 py-2 lg:py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-indigo-700 active:from-blue-700 active:to-indigo-800 transition-all text-sm lg:text-base touch-manipulation"
             >
-              Send
+              <span class="hidden sm:inline">Send</span>
+              <span class="sm:hidden">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                </svg>
+              </span>
             </button>
           </form>
         </div>
@@ -369,6 +420,13 @@ defmodule ChatphoriaWeb.ChatLive do
       const messagesContainer = document.getElementById('messages-container');
       if (messagesContainer) {
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+
+      // Close sidebar when clicking on a room (mobile only)
+      if (window.innerWidth < 1024) {
+        document.addEventListener('phx:page-loading-stop', () => {
+          // This will be handled by the toggle_sidebar event
+        });
       }
     </script>
     """
