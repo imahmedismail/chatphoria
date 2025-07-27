@@ -68,7 +68,7 @@ A full-featured, real-time chat application built with Phoenix LiveView and Tail
 
 Watch this comprehensive demo showcasing all of Chatphoria's features:
 
-https://github.com/user-attachments/assets/videos/project-tutorial.mov
+[![Watch the demo]](https://github.com/imahmedismail/chatphoria/blob/main/assets/videos/demo.mp4?raw=true)
 
 > **What you'll see in this video:**
 > - 🔐 User registration and authentication
