@@ -40,6 +40,10 @@ defmodule ChatphoriaWeb.ChatLive do
       Accounts.update_user_status(user, "online")
     end
 
+    # Load any existing draft
+    draft = Chat.get_context_draft(user_id, "room", default_room.id)
+    draft_content = if draft, do: draft.content, else: ""
+
     {:ok,
      socket
      |> assign(:user, user)
@@ -50,7 +54,8 @@ defmodule ChatphoriaWeb.ChatLive do
      |> assign(:current_conversation, nil)
      |> assign(:chat_type, :room)
      |> assign(:messages, messages)
-     |> assign(:new_message, "")
+     |> assign(:new_message, draft_content)
+     |> assign(:current_draft, draft)
      |> assign(:online_users, Accounts.get_online_users())
      |> assign(:show_create_room, false)
      |> assign(:new_room_name, "")
@@ -73,6 +78,11 @@ defmodule ChatphoriaWeb.ChatLive do
         {:noreply, socket}
 
       content ->
+        # Delete any existing draft
+        if socket.assigns.current_draft do
+          Chat.delete_message_draft(socket.assigns.current_draft)
+        end
+
         message_attrs = %{
           content: content,
           user_id: socket.assigns.user.id
@@ -207,8 +217,40 @@ defmodule ChatphoriaWeb.ChatLive do
 
   @impl true
   def handle_event("typing", %{"value" => message}, socket) do
+    # Save draft if content is not empty
     if String.trim(message) != "" do
-      # Broadcast typing indicator
+      context_type = Atom.to_string(socket.assigns.chat_type)
+      context_id = get_context_id(socket.assigns)
+
+      draft_attrs = %{
+        content: message,
+        user_id: socket.assigns.user.id,
+        context_type: context_type
+      }
+
+      draft_attrs =
+        case socket.assigns.chat_type do
+          :room -> Map.put(draft_attrs, :room_id, context_id)
+          :conversation -> Map.put(draft_attrs, :conversation_id, context_id)
+        end
+
+      case socket.assigns.current_draft do
+        nil ->
+          case Chat.create_message_draft(draft_attrs) do
+            {:ok, draft} -> {:noreply, assign(socket, :current_draft, draft)}
+            _ -> {:noreply, socket}
+          end
+
+        draft ->
+          case Chat.update_message_draft(draft, draft_attrs) do
+            {:ok, updated_draft} -> {:noreply, assign(socket, :current_draft, updated_draft)}
+            _ -> {:noreply, socket}
+          end
+      end
+    end
+
+    # Broadcast typing indicator
+    if String.trim(message) != "" do
       topic =
         case socket.assigns.chat_type do
           :room -> "room:#{socket.assigns.current_room.id}"
@@ -220,7 +262,6 @@ defmodule ChatphoriaWeb.ChatLive do
         typing: true
       })
 
-      # Schedule stop typing after 2 seconds
       Process.send_after(self(), :stop_typing, 2000)
     end
 
@@ -233,12 +274,22 @@ defmodule ChatphoriaWeb.ChatLive do
     room = Chat.get_room!(room_id)
     messages = Chat.list_messages_for_room(room_id)
 
-    # Unsubscribe from current room/conversation
+    # Mark previous room as read
     if socket.assigns.chat_type == :room do
+      Chat.mark_room_as_read(socket.assigns.current_room.id, socket.assigns.user.id)
       ChatphoriaWeb.Endpoint.unsubscribe("room:#{socket.assigns.current_room.id}")
     else
+      Chat.mark_conversation_as_read(
+        socket.assigns.current_conversation.id,
+        socket.assigns.user.id
+      )
+
       ChatphoriaWeb.Endpoint.unsubscribe("conversation:#{socket.assigns.current_conversation.id}")
     end
+
+    # Load any existing draft for this room
+    draft = Chat.get_context_draft(socket.assigns.user.id, "room", room_id)
+    draft_content = if draft, do: draft.content, else: ""
 
     # Subscribe to new room
     ChatphoriaWeb.Endpoint.subscribe("room:#{room_id}")
@@ -249,6 +300,8 @@ defmodule ChatphoriaWeb.ChatLive do
      |> assign(:current_conversation, nil)
      |> assign(:chat_type, :room)
      |> assign(:messages, messages)
+     |> assign(:new_message, draft_content)
+     |> assign(:current_draft, draft)
      |> assign(:typing_users, [])
      |> assign(:show_sidebar, false)}
   end
@@ -259,15 +312,28 @@ defmodule ChatphoriaWeb.ChatLive do
     conversation = Chat.get_conversation!(conversation_id)
     messages = Chat.list_messages_for_conversation(conversation_id)
 
-    # Unsubscribe from current room/conversation
+    # Mark previous context as read
     if socket.assigns.chat_type == :room do
+      Chat.mark_room_as_read(socket.assigns.current_room.id, socket.assigns.user.id)
       ChatphoriaWeb.Endpoint.unsubscribe("room:#{socket.assigns.current_room.id}")
     else
+      Chat.mark_conversation_as_read(
+        socket.assigns.current_conversation.id,
+        socket.assigns.user.id
+      )
+
       ChatphoriaWeb.Endpoint.unsubscribe("conversation:#{socket.assigns.current_conversation.id}")
     end
 
+    # Load any existing draft for this conversation
+    draft = Chat.get_context_draft(socket.assigns.user.id, "conversation", conversation_id)
+    draft_content = if draft, do: draft.content, else: ""
+
     # Subscribe to new conversation
     ChatphoriaWeb.Endpoint.subscribe("conversation:#{conversation_id}")
+
+    # Mark conversation as read
+    Chat.mark_conversation_as_read(conversation_id, socket.assigns.user.id)
 
     {:noreply,
      socket
@@ -275,6 +341,8 @@ defmodule ChatphoriaWeb.ChatLive do
      |> assign(:current_room, nil)
      |> assign(:chat_type, :conversation)
      |> assign(:messages, messages)
+     |> assign(:new_message, draft_content)
+     |> assign(:current_draft, draft)
      |> assign(:typing_users, [])
      |> assign(:show_sidebar, false)}
   end
@@ -285,6 +353,14 @@ defmodule ChatphoriaWeb.ChatLive do
         socket
       ) do
     updated_messages = socket.assigns.messages ++ [message]
+
+    # Mark message as read if user is active in this room
+    if socket.assigns.chat_type == :room &&
+         socket.assigns.current_room.id == message.room_id &&
+         message.user_id != socket.assigns.user.id do
+      Chat.mark_message_as_read(message.id, socket.assigns.user.id)
+    end
+
     {:noreply, assign(socket, :messages, updated_messages)}
   end
 
@@ -298,6 +374,14 @@ defmodule ChatphoriaWeb.ChatLive do
         socket
       ) do
     updated_messages = socket.assigns.messages ++ [message]
+
+    # Mark message as read if user is active in this conversation
+    if socket.assigns.chat_type == :conversation &&
+         socket.assigns.current_conversation.id == message.conversation_id &&
+         message.user_id != socket.assigns.user.id do
+      Chat.mark_message_as_read(message.id, socket.assigns.user.id)
+    end
+
     {:noreply, assign(socket, :messages, updated_messages)}
   end
 
@@ -371,6 +455,13 @@ defmodule ChatphoriaWeb.ChatLive do
       ) do
     updated_typing = Enum.reject(socket.assigns.typing_users, &(&1.id == user.id))
     {:noreply, assign(socket, :typing_users, updated_typing)}
+  end
+
+  defp get_context_id(assigns) do
+    case assigns.chat_type do
+      :room -> assigns.current_room.id
+      :conversation -> assigns.current_conversation.id
+    end
   end
 
   @impl true
@@ -702,13 +793,39 @@ defmodule ChatphoriaWeb.ChatLive do
                 ]}>
                   <p class="text-sm lg:text-base leading-relaxed">{message.content}</p>
                   <div class={[
-                    "text-xs mt-1 flex",
+                    "text-xs mt-1 flex items-center space-x-1",
                     if(is_current_user,
                       do: "justify-end text-blue-100",
                       else: "justify-end text-gray-500"
                     )
                   ]}>
-                    {Calendar.strftime(message.inserted_at, "%H:%M")}
+                    <span>{Calendar.strftime(message.inserted_at, "%H:%M")}</span>
+                    <%= if is_current_user do %>
+                      <% status =
+                        Chat.get_message_receipt_status(message.id, @current_conversation.id) %>
+                      <%= case status do %>
+                        <% :delivered -> %>
+                          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              d="M5 13l4 4L19 7"
+                            >
+                            </path>
+                          </svg>
+                        <% :read -> %>
+                          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              d="M5 13l4 4L19 7M5 13l4 4L19 7"
+                            >
+                            </path>
+                          </svg>
+                      <% end %>
+                    <% end %>
                   </div>
                 </div>
               </div>
@@ -726,6 +843,22 @@ defmodule ChatphoriaWeb.ChatLive do
                     <span class="text-xs text-gray-500 flex-shrink-0">
                       {Calendar.strftime(message.inserted_at, "%H:%M")}
                     </span>
+                    <%= if message.user.id == @user.id do %>
+                      <% status = Chat.get_message_receipt_status(message.id, @current_room.id) %>
+                      <span class="text-xs text-gray-400">
+                        <%= case status do %>
+                          <% :delivered -> %>
+                            · Delivered
+                          <% :read -> %>
+                            <% read_count = Chat.count_message_reads(message.id) %> · Read by {if read_count >
+                                                                                                    0,
+                                                                                                  do:
+                                                                                                    read_count,
+                                                                                                  else:
+                                                                                                    "0"} members
+                        <% end %>
+                      </span>
+                    <% end %>
                   </div>
                   <p class="text-gray-700 leading-relaxed text-sm lg:text-base break-words">
                     {message.content}
