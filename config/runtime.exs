@@ -30,10 +30,21 @@ if config_env() == :prod do
 
   maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
 
+  # Configure SSL based on environment
+  ssl_config = case System.get_env("DATABASE_SSL") do
+    "false" -> false
+    "disable" -> false
+    _ -> [
+      verify: :verify_none,
+      versions: [:"tlsv1.2", :"tlsv1.3"]
+    ]
+  end
+
   config :chatphoria, Chatphoria.Repo,
     url: database_url,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
-    socket_options: maybe_ipv6
+    socket_options: maybe_ipv6,
+    ssl: ssl_config
 
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you
