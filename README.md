@@ -62,6 +62,25 @@ A full-featured, real-time chat application built with Phoenix LiveView and Tail
 3. **Visit the app:**
    Open [localhost:4000](http://localhost:4000) in your browser
 
+## 🎥 Video Tutorial
+
+### Complete App Walkthrough
+
+Watch this comprehensive demo showcasing all of Chatphoria's features:
+
+https://github.com/user-attachments/assets/videos/project-tutorial.mov
+
+> **What you'll see in this video:**
+> - 🔐 User registration and authentication
+> - 💬 Group chat rooms vs Direct messaging
+> - 🎨 WhatsApp-style conversation interface  
+> - 📱 Mobile responsive design
+> - ⚡ Real-time messaging and typing indicators
+> - 🔔 Smart auto-dismissing notifications
+> - 👥 User presence and online status
+
+*Video demonstrates both desktop and mobile experiences*
+
 ### Sample Data
 
 The app comes with pre-seeded data including:
